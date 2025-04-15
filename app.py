@@ -67,37 +67,65 @@ GB_MODEL_FILE = 'best_model_gradient_boosting.pkl'
 def load_model(model_name):
     try:
         if model_name == "Multiple Linear Regression":
-            with open(MLR_MODEL_FILE, 'rb') as file:
-                return pickle.load(file)
+            if os.path.exists(MLR_MODEL_FILE):
+                with open(MLR_MODEL_FILE, 'rb') as file:
+                    return pickle.load(file)
+            else:
+                st.sidebar.warning(f"Model file {MLR_MODEL_FILE} not found. Using dummy model.")
+                return DummyModel()
         else:  # Gradient Boosting
-            with open(GB_MODEL_FILE, 'rb') as file:
-                return pickle.load(file)
-    except FileNotFoundError:
-        st.error(f"Model file not found. Please make sure the model file is in the same directory as this script.")
-        return None
+            if os.path.exists(GB_MODEL_FILE):
+                with open(GB_MODEL_FILE, 'rb') as file:
+                    return pickle.load(file)
+            else:
+                st.sidebar.warning(f"Model file {GB_MODEL_FILE} not found. Using dummy model.")
+                return DummyModel()
+    except Exception as e:
+        st.sidebar.warning(f"Error loading model: {str(e)}. Using dummy model.")
+        return DummyModel()
+
+# Simple dummy model class that mimics scikit-learn API for prediction
+class DummyModel:
+    def __init__(self):
+        self.feature_names_in_ = [
+            'trip_distance', 'trip_duration', 'passenger_count', 'hour_of_day',
+            'pickup_month', 'pickup_year', 'RatecodeID', 'payment_type', 'trip_type',
+            'weekday_Tuesday', 'weekday_Wednesday', 'weekday_Thursday', 
+            'weekday_Friday', 'weekday_Saturday', 'weekday_Sunday',
+            'store_and_fwd_flag_Y'
+        ]
+        self.feature_importances_ = np.array([0.5, 0.2, 0.05, 0.05, 0.05, 0.03, 0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01])
+    
+    def predict(self, X):
+        # Simple formula based on typical taxi fare calculation
+        base_fare = 2.75
+        distance_rate = 2.5  # per mile
+        time_rate = 0.35  # per minute
+        
+        # Get values from DataFrame X
+        distance = X['trip_distance'].values[0]
+        duration = X['trip_duration'].values[0]
+        passengers = X['passenger_count'].values[0]
+        
+        # Apply a simple formula
+        fare = base_fare + (distance * distance_rate) + (duration * time_rate)
+        
+        # Add small variations based on other factors
+        if X['hour_of_day'].values[0] > 20 or X['hour_of_day'].values[0] < 6:
+            fare *= 1.1  # Night surcharge
+        
+        if any([X[f'weekday_{day}'].values[0] for day in ['Saturday', 'Sunday']]):
+            fare *= 1.05  # Weekend surcharge
+            
+        return np.array([fare])
 
 model = load_model(model_option)
 
 # Extract feature names from the model
 @st.cache_data
 def get_model_features():
-    try:
-        # First try gradient boosting model which has feature_names_in_
-        with open(GB_MODEL_FILE, 'rb') as file:
-            gb_model = pickle.load(file)
-            if hasattr(gb_model, 'feature_names_in_'):
-                return list(gb_model.feature_names_in_)
-    except:
-        pass
-    
-    try:
-        # Then try the linear regression model
-        with open(MLR_MODEL_FILE, 'rb') as file:
-            lr_model = pickle.load(file)
-            if hasattr(lr_model, 'feature_names_in_'):
-                return list(lr_model.feature_names_in_)
-    except:
-        pass
+    if hasattr(model, 'feature_names_in_'):
+        return list(model.feature_names_in_)
     
     # Fallback to a common set of features based on your analysis
     return [
