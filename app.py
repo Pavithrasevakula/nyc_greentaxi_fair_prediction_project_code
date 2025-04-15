@@ -66,6 +66,13 @@ GB_MODEL_FILE = 'best_model_gradient_boosting.pkl'
 @st.cache_resource
 def load_model(model_name):
     try:
+        # First try to import sklearn
+        try:
+            import sklearn
+        except ImportError:
+            # Silently fall back to dummy model if sklearn is not available
+            return DummyModel()
+            
         if model_name == "Multiple Linear Regression":
             if os.path.exists(MLR_MODEL_FILE):
                 with open(MLR_MODEL_FILE, 'rb') as file:
